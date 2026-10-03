@@ -1,0 +1,657 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.82in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{amsmath,amssymb}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{lastpage}
+
+\definecolor{navy}{HTML}{16324F}
+\definecolor{teal}{HTML}{167D7F}
+\definecolor{orange}{HTML}{D97706}
+\definecolor{lightblue}{HTML}{EAF3F8}
+\definecolor{lightgray}{HTML}{F4F5F7}
+\definecolor{codegreen}{HTML}{276749}
+\definecolor{codered}{HTML}{9B2C2C}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=navy,
+  urlcolor=teal,
+  citecolor=orange,
+  pdftitle={Wildfire Modeling and Machine Learning Research Roadmap},
+  pdfauthor={Research onboarding guide}
+}
+
+\titleformat{\section}{\Large\bfseries\color{navy}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{teal}}{\thesubsection}{0.7em}{}
+\setlist{nosep,leftmargin=1.5em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\renewcommand{\arraystretch}{1.18}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Wildfire ML Research Roadmap}
+\rhead{\thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\lstdefinestyle{terminal}{
+  backgroundcolor=\color{lightgray},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{navy!35},
+  keywordstyle=\color{navy}\bfseries,
+  commentstyle=\color{codegreen},
+  stringstyle=\color{codered},
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true
+}
+\lstset{style=terminal}
+
+\newcommand{\important}[1]{%
+  \begin{center}
+  \fcolorbox{orange}{orange!8}{\parbox{0.93\linewidth}{\textbf{Important:} #1}}
+  \end{center}}
+
+\newcommand{\deliverable}[1]{\textcolor{teal}{\textbf{Deliverable:}} #1}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{1.2cm}
+{\Huge\bfseries\color{navy} Wildfire Modeling and Machine Learning\par}
+\vspace{0.25cm}
+{\LARGE\color{teal} Research Onboarding Roadmap\par}
+\vspace{0.8cm}
+\rule{0.85\textwidth}{1pt}
+\vspace{0.8cm}
+
+{\large A practical guide to WRF-SFIRE, WRF-Chem, FARSITE/FlamMap,\par
+research objectives, experiments, evaluation, and career preparation\par}
+
+\vfill
+\begin{tabular}{rl}
+Student: & \textit{Your name} \\
+Advisor: & \textit{Professor's name} \\
+Laboratory: & \textit{Research group} \\
+Prepared: & October 3, 2026 \\
+Status: & Living research plan; confirm scope with advisor
+\end{tabular}
+\vfill
+
+\important{The project description below is a reasoned interpretation of the first meeting, not a substitute for the advisor's exact research question. The first research task is to convert the professor's idea into a one-page, measurable problem statement.}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Executive answer: what this project probably is}
+
+The most defensible interpretation is:
+
+\begin{quote}
+Build and rigorously evaluate a computationally cheaper machine-learning surrogate (or hybrid physics--ML system) for a carefully selected part of WRF-SFIRE, so that it predicts fire evolution with accuracy close to the physics baseline while using much less wall time, memory, and energy.
+\end{quote}
+
+WRF-SFIRE is \emph{not} itself an AI model. It is a coupled numerical weather--wildfire model. WRF computes the evolving atmosphere; SFIRE advances a fire front, commonly with a level-set method and semi-empirical spread-rate formulas. Wind drives the fire, and fire heat and moisture fluxes feed back into the atmosphere \cite{mandel2011}. This two-way coupling is scientifically valuable and computationally expensive.
+
+The phrase ``predict fire'' is ambiguous. It could mean:
+\begin{enumerate}
+  \item \textbf{ignition occurrence}: will a fire start in a place and time?
+  \item \textbf{fire spread}: where will the perimeter be over the next hours?
+  \item \textbf{fire behavior}: rate of spread, flame length, intensity, or heat flux;
+  \item \textbf{smoke and air quality}: where will emissions and particulate matter travel?
+  \item \textbf{risk}: burn probability or expected impact under many scenarios.
+\end{enumerate}
+
+The repositories and software mentioned in the meeting point most strongly to items 2--4. Do not train a model until the advisor selects the target.
+
+\important{``Same or better accuracy with less GPU'' needs correction. Traditional WRF-SFIRE is primarily a CPU-parallel MPI/OpenMP scientific code; a GPU is not normally required for the basic build. The proposed ML system may use a GPU for training and inference. The comparison must therefore report wall-clock time, CPU/GPU hours, peak RAM/VRAM, energy if possible, and predictive error.}
+
+\section{What each repository or program does}
+
+\begin{longtable}{p{0.19\textwidth}p{0.29\textwidth}p{0.23\textwidth}p{0.21\textwidth}}
+\toprule
+\textbf{Tool} & \textbf{Purpose} & \textbf{Inputs/outputs} & \textbf{Likely role in your project} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tool} & \textbf{Purpose} & \textbf{Inputs/outputs} & \textbf{Likely role in your project} \\
+\midrule
+\endhead
+WRF-SFIRE & Two-way coupled atmosphere and wildland-fire simulation built on WRF. Current repository documentation labels the release W4.4-S0.1 and selects SFIRE with \texttt{ifire=1} \cite{wrfsfireRepo}. & Terrain, fuels, moisture, atmospheric initial/boundary conditions, ignition; outputs gridded weather, fire arrival/spread, heat flux, and related fields. & High-fidelity teacher/baseline and synthetic-data generator. It may also be retained as a physics component in a hybrid system. \\
+\addlinespace
+WRF-Chem & WRF coupled with atmospheric chemistry. It simulates gases, aerosols, emissions, transport, chemical reactions, and deposition. NCAR states that WRF-Chem is no longer under active development, although selected schemes and preprocessing tools remain supported \cite{wrfchem}. & Meteorology, emissions, chemistry initial/boundary conditions; outputs 3-D chemical and aerosol fields. & Relevant if the project includes smoke, PM$_{2.5}$, or air quality. It is not necessary for a first fire-perimeter surrogate. \\
+\addlinespace
+WRF-Chem Preprocessing Tools & NCAR utilities that prepare chemical boundary/initial conditions and anthropogenic, biogenic, aircraft, and fire-emission inputs. The \texttt{fire\_emiss} tool processes FINN fire-emission inventory data \cite{chemtools}. & External inventories/global models to WRF-Chem-ready NetCDF files. & Data preparation for a smoke/chemistry branch, not a substitute for WRF-SFIRE and not an ML repository. \\
+\addlinespace
+FlamMap 6 & Windows desktop fire-analysis system. It can compute potential fire behavior, spread, conditional burn probabilities, and longer fire growth under specified fuels, terrain, moisture, wind, and weather \cite{flammap}. & An eight-layer landscape file (elevation, slope, aspect, fuel model, canopy cover, height, base height, and bulk density), plus weather/wind/moisture; outputs spread rate, flame length, intensity, crown-fire activity, growth, burn probability, emissions, and consumption. & Independent baseline, domain-learning tool, or source of scenario data. Easier first exposure than a real-data WRF-SFIRE workflow, but it is a different model. \\
+\addlinespace
+FARSITE & Fire Area Simulator for time-varying fire growth. The Forest Service states that FARSITE 4 is no longer supported or downloadable and is now included in FlamMap 6 \cite{farsite}. & Landscape, fuels, weather, wind, moisture, ignition; outputs time-evolving fire growth and behavior. & A comparison baseline through FlamMap 6. Do not search for a separate modern FARSITE 4 installer. \\
+\addlinespace
+\texttt{far.site} & Commercial Federal Acquisition Regulation compliance software, unrelated to wildfire modeling \cite{farsiteWrong}. & Government-contract compliance data. & None. This link was probably a transcription or naming mix-up; ask whether the professor meant FARSITE. \\
+\bottomrule
+\end{longtable}
+
+\subsection{What the NASA connection does and does not mean}
+
+NASA Applied Sciences has described WRF-SFIRE as an open-source system for forecasts of fuel moisture, fire spread, smoke, and weather, and NASA-supported work has used it in fire applications \cite{nasaFire}. This supports the claim that the system is credible and relevant to NASA-funded or NASA-used research. It does \emph{not}, by itself, prove a formal ``NASA certification'' or that the GitHub repository passed a universal NASA acceptance test. In a paper or presentation, use the precise wording ``used/described in NASA Applied Sciences work'' unless the professor supplies a specific program, award, benchmark, or acceptance document.
+
+\section{A strong project objective}
+
+\subsection{Recommended first objective}
+
+Start narrower than a complete replacement of WRF-SFIRE:
+
+\begin{quote}
+Given terrain, fuel category, fuel moisture, ignition geometry, and near-surface wind fields, predict the fire-arrival-time field (or a sequence of burned-area masks) over a fixed forecast horizon. Compare against held-out WRF-SFIRE simulations and simple baselines. Demonstrate a pre-agreed error tolerance and a pre-agreed speed/memory improvement on the same hardware.
+\end{quote}
+
+This objective is achievable because the output is spatial, physically interpretable, and convertible into perimeters at any forecast time. Fire arrival time $T(x,y)$ yields a burned mask at time $t$ by
+\begin{equation}
+B_t(x,y)=\mathbb{1}\{T(x,y)\le t\}.
+\end{equation}
+
+After this succeeds, extend to uncertainty, real terrain, changing weather, coupled atmospheric feedback, or smoke.
+
+\subsection{Three possible scopes to confirm with the advisor}
+
+\begin{enumerate}
+  \item \textbf{Level A: fire-spread surrogate.} Prescribed wind/terrain/fuels $\rightarrow$ arrival time or perimeter. Lowest complexity and best starting point.
+  \item \textbf{Level B: coupled fire--weather emulator.} Initial atmospheric and land state $\rightarrow$ both fire and selected near-fire weather variables. More faithful, much harder, and autoregressive stability matters.
+  \item \textbf{Level C: fire--smoke/chemistry system.} Fire and weather $\rightarrow$ emission injection and downwind smoke/PM fields. Requires WRF-Chem knowledge and preprocessing; it should be a later milestone unless this is explicitly the lab's central goal.
+\end{enumerate}
+
+\subsection{Proposed success criteria}
+
+Replace the bracketed values after discussion:
+\begin{itemize}
+  \item median fire-arrival-time MAE $\le$ [10--20] minutes over burned cells;
+  \item perimeter/burned-area IoU $\ge$ [0.80] at [1, 2, 4, 6] hours;
+  \item 95th-percentile symmetric boundary distance $\le$ [two fire-grid cells];
+  \item final burned-area relative error $\le$ [10\%];
+  \item inference speedup $\ge$ [50--100$\times$] versus the defined WRF-SFIRE workflow;
+  \item peak memory reduction $\ge$ [value] or inference within [hardware limit];
+  \item no physically impossible unburning, no spread through non-burnable cells, and stable rollouts;
+  \item acceptable performance on geographically and meteorologically out-of-distribution tests.
+\end{itemize}
+
+Accuracy and efficiency are a Pareto tradeoff. Report the frontier rather than claiming one model is universally best.
+
+\section{Questions to take to the next advisor meeting}
+
+Ask these before spending weeks installing software or training models:
+
+\begin{enumerate}
+  \item What exact target is intended: ignition, perimeter, arrival time, intensity, smoke, or air quality?
+  \item Does ``same accuracy'' mean agreement with WRF-SFIRE, agreement with observed fires, or both?
+  \item Which geographic region, spatial resolution, forecast horizon, and update frequency matter?
+  \item Is the desired model a full surrogate, a correction to a physics model, a downscaler, or a data-assimilation component?
+  \item Is there an existing simulation/observation dataset, configuration, benchmark case, or prior student's code?
+  \item Which WRF-SFIRE commit/tag, namelists, WPS data, and compiler environment are the lab standard?
+  \item What did ``accepted by NASA'' refer to: funding, deployment, validation, publication, or a specific benchmark?
+  \item Did the professor mean FARSITE rather than \url{https://far.site/}?
+  \item What compute is available: workstation specifications, university HPC allocation, cloud credits, storage, and job limits?
+  \item What is the expected first deliverable and date: literature review, reproducible run, dataset, baseline model, paper, or demo?
+  \item What restrictions apply to operational or observational data, and who owns resulting code and data?
+  \item Which publication venue or end-user decision is the project designed to support?
+\end{enumerate}
+
+\section{How to build and run WRF-SFIRE}
+
+\subsection{Expectations before installation}
+
+The repository is a large Fortran/C scientific application, not a Python package. Compilation is normal. The idealized \texttt{em\_fire} case avoids WPS and real weather data, so it is the correct first milestone. A real-fire case adds WPS, static geographic data, meteorological GRIB files, fuel/terrain preparation, nesting, boundary conditions, and much more storage.
+
+The official WRF guide identifies NetCDF as mandatory. MPI is needed for distributed-memory runs. WPS handling of GRIB2 normally needs zlib, libpng, and JasPer. Compiler/library consistency matters \cite{wrfCompile}. The older OpenWFM compile page gives the project-specific sequence \texttt{configure}, \texttt{compile em\_fire}, and optionally \texttt{compile em\_real} \cite{openwfmCompile}.
+
+\subsection{Recommended environment}
+
+Use Linux. On Windows, use a native Linux workstation, university cluster, or WSL2 with enough RAM and disk; FlamMap itself requires 64-bit Windows \cite{flammap}. Record all versions. For reproducible research, a lab-maintained container or HPC module recipe is better than undocumented manual setup.
+
+Suggested minimum for an idealized learning run: 4--8 modern CPU cores, 16 GB RAM, and 30--60 GB free disk. A real high-resolution coupled case may need far more cores, RAM, and storage. These are planning estimates, not repository guarantees.
+
+\subsection{Ubuntu/Debian quick-start for the idealized fire case}
+
+Commands below are a practical GNU/OpenMPI route. Package names vary by operating system. Do not blindly run them on a managed cluster; use its modules and ask the administrator.
+
+\begin{lstlisting}[language=bash,caption={Install a consistent GNU toolchain and common dependencies}]
+sudo apt update
+sudo apt install -y build-essential gfortran m4 csh perl git \
+  libnetcdf-dev libnetcdff-dev netcdf-bin \
+  openmpi-bin libopenmpi-dev
+
+gcc --version
+gfortran --version
+nc-config --all
+nf-config --all
+mpif90 --version
+\end{lstlisting}
+
+Clone a fixed revision. For initial exploration, \texttt{master} is convenient; for research, pin the exact commit and never let a moving branch silently change the dataset.
+
+\begin{lstlisting}[language=bash,caption={Clone and record provenance}]
+git clone https://github.com/openwfm/WRF-SFIRE.git
+cd WRF-SFIRE
+git checkout master
+git rev-parse HEAD | tee SOURCE_COMMIT.txt
+git submodule update --init --recursive
+\end{lstlisting}
+
+On typical Ubuntu packages, NetCDF is under \texttt{/usr}. Confirm with \texttt{nc-config} and \texttt{nf-config}. Then configure:
+
+\begin{lstlisting}[language=bash,caption={Configure WRF-SFIRE}]
+export NETCDF=/usr
+export CC=gcc
+export CXX=g++
+export FC=gfortran
+export F77=gfortran
+export F90=gfortran
+export OMP_NUM_THREADS=1
+
+./clean -a
+./configure
+\end{lstlisting}
+
+Choose a GNU option that actually exists in the displayed menu. For a first laptop test, serial is easiest; for useful multicore execution, choose GNU \texttt{dmpar} and basic nesting (option 1). Save the terminal choice in a lab notebook.
+
+Compile the ideal case. If parallel compilation hides the first error, retry with \texttt{-j 1}.
+
+\begin{lstlisting}[language=bash,caption={Compile and verify}]
+./compile em_fire -j 4 >& compile_em_fire.log
+tail -n 40 compile_em_fire.log
+grep -n -i "error" compile_em_fire.log | head
+ls -lh main/ideal.exe main/wrf.exe
+\end{lstlisting}
+
+The repository states that compilation creates links and test subdirectories under \texttt{test/em\_fire}; the default linked case is \texttt{hill\_simple} \cite{emFireReadme}. Initialize and run it:
+
+\begin{lstlisting}[language=bash,caption={Run the idealized hill case}]
+cd test/em_fire
+grep -n "ifire" namelist.input
+./ideal.exe >& ideal.log
+
+# Serial build:
+./wrf.exe >& wrf.log
+
+# For a dmpar build, use this instead of the serial command:
+# mpirun -np 4 ./wrf.exe >& wrf.log
+
+tail -n 30 wrf.log
+grep -n "SUCCESS COMPLETE WRF" rsl.error.0000 wrf.log 2>/dev/null
+ls -lh wrfinput_d01 wrfout_d01_*
+\end{lstlisting}
+
+Check that \texttt{ifire=1} selects WRF-SFIRE. Do not assume a run is correct merely because an output file exists: inspect the log, timestamps, fields, and spatial evolution. Use Python packages such as \texttt{xarray}, \texttt{netCDF4}, \texttt{wrf-python}, \texttt{matplotlib}, and \texttt{cartopy} for analysis, preferably in a separate environment.
+
+\subsection{Troubleshooting order}
+
+\begin{enumerate}
+  \item Read the \emph{first} compiler error, not the last cascading error.
+  \item Verify \texttt{gcc}, \texttt{gfortran}, NetCDF-C, NetCDF-Fortran, and MPI use compatible toolchains.
+  \item Confirm \texttt{nc-config --prefix}, \texttt{nf-config --prefix}, headers, and libraries agree.
+  \item Run \texttt{./clean -a}, reconfigure, and compile with one job.
+  \item Check disk space, memory, stack limits, and permissions.
+  \item On MPI failure, first prove a serial build/run, then isolate the MPI configuration.
+  \item Preserve \texttt{configure.wrf}, compile logs, namelists, commit SHA, environment/module list, and commands with every experiment.
+\end{enumerate}
+
+\subsection{Moving from idealized to real-data simulations}
+
+A real case generally requires:
+\begin{enumerate}
+  \item compile \texttt{em\_real};
+  \item compile a compatible WPS version against the WRF-SFIRE build;
+  \item download WPS static geography data and meteorological forcing (for example, an appropriate analysis/forecast product);
+  \item configure domains and nests in \texttt{namelist.wps};
+  \item run \texttt{geogrid.exe}, link GRIB files, run \texttt{ungrib.exe}, and run \texttt{metgrid.exe};
+  \item prepare fire-grid terrain, fuels, moisture, and ignition consistently with the SFIRE namelist;
+  \item run \texttt{real.exe}, validate boundary/initial fields, then run \texttt{wrf.exe};
+  \item compare against observations only after checking coordinate systems, timestamps, units, and spin-up.
+\end{enumerate}
+
+This is where the professor's known-good case is extremely valuable. Reproducing a lab case is safer than inventing one from scratch.
+
+\section{A disciplined ML research workflow}
+
+\subsection{Phase 0: define the claim before the model}
+
+Write one page containing:
+\begin{itemize}
+  \item input fields and their units/resolution;
+  \item target fields and forecast horizons;
+  \item operational constraints and target hardware;
+  \item in-distribution and out-of-distribution test definitions;
+  \item accuracy, speed, memory, and uncertainty metrics;
+  \item baselines and ablations;
+  \item what would falsify the hypothesis.
+\end{itemize}
+
+\deliverable{Advisor-approved problem statement and evaluation protocol.}
+
+\subsection{Phase 1: reproduce the physics baseline}
+
+Run one idealized case unchanged. Then vary only one factor at a time (wind speed/direction, fuel, moisture, slope, or ignition). Confirm that outputs respond physically. Profile runtime, CPU utilization, memory, output size, and failure modes.
+
+\deliverable{A script/notebook producing plots, metrics, logs, and a reproducibility manifest from a clean run.}
+
+\subsection{Phase 2: design a dataset, not just a pile of runs}
+
+Construct a parameter table before simulation. Use space-filling or stratified sampling across plausible ranges, and include edge cases. Store:
+\begin{itemize}
+  \item static inputs: elevation, slope, aspect, fuel type/properties, canopy fields;
+  \item dynamic inputs: wind components, temperature, humidity, fuel moisture, pressure, and possibly boundary forcing;
+  \item ignition: location, time, geometry, and uncertainty;
+  \item targets: fire arrival time, burned mask sequence, spread rate, heat flux, and selected atmospheric fields;
+  \item provenance: source commit, configuration, seed, compiler, machine, start/end time, checksums, and run status.
+\end{itemize}
+
+Use chunked formats such as Zarr or NetCDF/HDF5 with explicit metadata. Keep raw outputs immutable; create versioned processed datasets. Build automatic quality-control tests for NaNs, units, monotonic burn progression, non-burnable masks, time ordering, and coordinate alignment.
+
+Avoid leakage. Randomly splitting neighboring frames from the same simulation makes test results unrealistically easy. Split by complete simulation, event, geography, and preferably weather regime. Reserve a truly untouched final test set.
+
+\deliverable{Versioned dataset card, generation manifest, QC report, and train/validation/test split file.}
+
+\subsection{Phase 3: establish baselines}
+
+Before a sophisticated network, evaluate:
+\begin{enumerate}
+  \item persistence/no-spread and simple radial/constant-rate predictors;
+  \item a reduced fire-spread calculation if available;
+  \item a small convolutional encoder--decoder or U-Net;
+  \item only then, operator-learning or sequence architectures such as FNO, U-Net rollouts, ConvLSTM, or a transformer if justified.
+\end{enumerate}
+
+The winning method is the smallest one that meets the agreed accuracy and deployment constraints. Parameter count alone is not compute cost; report measured latency and memory.
+
+\subsection{Phase 4: add physics and constraints}
+
+Useful constraints may include:
+\begin{itemize}
+  \item burned area cannot become unburned;
+  \item no spread through non-burnable fuels unless spotting is explicitly modeled;
+  \item nonnegative arrival-time increments and heat release;
+  \item rotation/reflection handling only when terrain, wind, and coordinates are transformed consistently;
+  \item losses emphasizing the moving boundary rather than overwhelming background pixels;
+  \item conservation or budget checks for any predicted fluxes;
+  \item uncertainty estimates or ensembles because a single deterministic perimeter can be dangerously overconfident.
+\end{itemize}
+
+A hybrid model may be scientifically stronger than a black-box replacement: keep a known spread law or coarse solver and learn a correction, closure, downscaling, or unresolved coupling term.
+
+\subsection{Phase 5: evaluate like an environmental model}
+
+Use several metric families:
+
+\begin{longtable}{p{0.22\textwidth}p{0.69\textwidth}}
+\toprule
+\textbf{Question} & \textbf{Metrics/checks} \\
+\midrule
+Arrival timing & MAE/RMSE/bias of $T(x,y)$ over valid/burned regions; stratify by horizon and rate-of-spread regime. \\
+Spatial overlap & IoU/Jaccard, Dice/F1, precision, recall, false alarm ratio, probability of detection. \\
+Boundary location & Hausdorff distance (prefer robust percentile), average symmetric surface distance, perimeter displacement. \\
+Size/shape & Absolute and relative burned-area error, perimeter length error, spread-direction error, connected components. \\
+Probabilistic skill & Reliability diagram, Brier score, CRPS, interval coverage and sharpness. \\
+Physical behavior & Monotonicity, barrier violations, unrealistic islands, stability over long rollouts, sensitivity to wind/slope/moisture. \\
+Efficiency & End-to-end latency including preprocessing and I/O, throughput, CPU/GPU hours, peak RAM/VRAM, energy, model/dataset storage. \\
+Robustness & New ignitions, winds, fuels, topography, grid spacing, regions, seasons, and perturbations; report failure cases. \\
+\bottomrule
+\end{longtable}
+
+Compare on the same machine or normalize carefully. Include WRF-SFIRE initialization and required preprocessing if the claimed use case includes them; do not compare only a neural forward pass with an entire physics workflow without explaining the boundary.
+
+\subsection{Phase 6: validate against observations}
+
+Agreement with WRF-SFIRE measures imitation, not truth. A publishable system should eventually compare with independent observations such as quality-controlled fire perimeters/arrival estimates, weather stations, airborne data, or satellite products. Satellite active-fire detections have missing observations, clouds, resolution limits, and timing uncertainty; treat them statistically, not as perfect labels \cite{mandelAssimilation}.
+
+Separate error sources: atmospheric forcing, fuels, moisture, ignition, physics, numerical resolution, observation error, and surrogate error. Otherwise ``ML error'' is not interpretable.
+
+\section{Suggested 12-week onboarding plan}
+
+\begin{longtable}{p{0.10\textwidth}p{0.54\textwidth}p{0.28\textwidth}}
+\toprule
+\textbf{Week} & \textbf{Work} & \textbf{Evidence of completion} \\
+\midrule
+1 & Confirm scope using the advisor questions; read the WRF-SFIRE model paper and repository README. & One-page objective and glossary. \\
+2 & Prepare Linux/toolchain; compile \texttt{em\_fire}; freeze commit and environment. & Executables, logs, manifest. \\
+3 & Run and visualize the unchanged idealized case; identify variables, dimensions, units. & Reproducible notebook and figures. \\
+4 & Sensitivity experiments varying one input at a time; profile runtime and memory. & Physics sanity-check report. \\
+5 & Finalize parameter ranges, storage schema, QC rules, and split policy. & Dataset design review. \\
+6 & Generate a small pilot ensemble; automatically detect failed or corrupted runs. & Pilot dataset v0.1 and QC dashboard. \\
+7 & Implement persistence/simple spread and small CNN/U-Net baselines. & Baseline table with fixed test cases. \\
+8 & Implement the main candidate model and training pipeline with seeds/checkpoints. & Reproducible training run. \\
+9 & Add boundary-aware/physics constraints and conduct ablations. & Ablation table. \\
+10 & Test new winds, fuels, slopes, and ignitions; measure calibration and rollout stability. & Robustness/error atlas. \\
+11 & Benchmark end-to-end CPU/GPU time, memory, energy if available, and accuracy frontier. & Pareto plot and profiling report. \\
+12 & Present results, limitations, failure cases, and next-stage real-data plan. & Advisor presentation and research memo. \\
+\bottomrule
+\end{longtable}
+
+If compilation or data access consumes more than a week, ask for the lab's known-good environment rather than silently losing a month.
+
+\section{Repository and experiment structure}
+
+Do not mix generated terabytes, upstream WRF source, and ML code in one unstructured directory. A reasonable layout is:
+
+\begin{lstlisting}[caption={Suggested project organization}]
+wildfire-surrogate/
+  README.md
+  CITATION.cff
+  environment/          # lock files, container recipe, module list
+  configs/              # versioned YAML/TOML experiment configs
+  scripts/              # dataset generation, launch, evaluation
+  src/                  # reusable Python package
+  tests/                # unit and physics-invariant tests
+  notebooks/            # exploration only, not the sole pipeline
+  metadata/             # manifests, split files, checksums
+  reports/              # figures, tables, manuscript sources
+  data/README.md         # locations and policy, not giant files in Git
+  wrf-sfire/             # pinned upstream clone/submodule if approved
+\end{lstlisting}
+
+Use Git for code/configuration, not giant NetCDF outputs. Use institutional storage, object storage, or a data registry for generated data. Every result should be reconstructable from a commit, configuration, dataset version, seed, and environment.
+
+\section{Common failure modes and how to avoid them}
+
+\begin{itemize}
+  \item \textbf{Undefined target:} ``predict fire'' produces the wrong dataset. Fix the scientific question first.
+  \item \textbf{Teacher equals truth:} matching WRF-SFIRE only proves emulation. Validate observations separately.
+  \item \textbf{Frame leakage:} nearby times from one run appear in train and test. Split at event/simulation level.
+  \item \textbf{Background-dominated loss:} predicting ``unburned everywhere'' looks accurate. Use boundary and class-aware metrics.
+  \item \textbf{No easy baseline:} a complex network beats nothing. Include persistence and simple physics/statistical baselines.
+  \item \textbf{Unfair speed claim:} CPU physics model versus GPU neural kernel with different I/O boundaries. Define end-to-end timing and hardware.
+  \item \textbf{Overfitting idealized cases:} strong test scores collapse on real terrain/weather. Design distribution shifts from day one.
+  \item \textbf{Ignoring uncertainty:} a crisp perimeter implies false confidence. Calibrate probabilities or ensembles.
+  \item \textbf{Changing upstream version:} moving \texttt{master} changes labels. Pin SHA/tag and archive configs.
+  \item \textbf{Running everything on a laptop:} start with idealized smoke tests locally; move ensemble generation to HPC.
+  \item \textbf{Starting with WRF-Chem:} chemistry greatly expands state and cost. Add it only if smoke/air quality is the defined target.
+\end{itemize}
+
+\section{Skills and prerequisites to study}
+
+\subsection{Scientific foundation}
+
+Learn enough to detect nonsense:
+\begin{itemize}
+  \item wildfire behavior: fuels, fuel moisture, Rothermel-type spread, slope/wind effects, crown fire, spotting limitations;
+  \item atmospheric science: wind fields, boundary layer, stability, humidity, terrain flows, nesting, initial/boundary conditions;
+  \item numerical modeling: grids, CFL stability, discretization, level-set methods, parameterization, convergence;
+  \item geospatial science: projections, raster alignment, resampling, GeoTIFF/NetCDF, GIS, LANDFIRE-style landscape layers;
+  \item uncertainty and validation: observational error, calibration, sensitivity, ensembles, data assimilation.
+\end{itemize}
+
+\subsection{Engineering and ML foundation}
+
+Prioritize Linux/bash, Git, Python, NumPy, xarray, NetCDF/Zarr, matplotlib/cartopy, PyTorch or JAX, configuration management, testing, profiling, Slurm, MPI concepts, and basic Fortran reading. Learn Docker/Apptainer after the first manual build so the environment becomes reproducible.
+
+For ML, master convolutional segmentation, spatiotemporal forecasting, class imbalance, autoregressive error, neural operators, uncertainty calibration, and distribution shift. The architecture name is less important than data design and evaluation.
+
+\section{Career value}
+
+Yes, this can help significantly with a job if the outcome is more than ``I trained a neural network.'' The combination is uncommon and valuable:
+
+\begin{itemize}
+  \item scientific ML and physics-informed modeling;
+  \item high-performance computing, MPI workflows, and profiling;
+  \item geospatial and Earth-observation data engineering;
+  \item environmental risk, weather, wildfire, smoke, and climate applications;
+  \item reproducible research and uncertainty-aware evaluation.
+\end{itemize}
+
+Relevant roles include scientific ML engineer, research software engineer, geospatial ML engineer, environmental data scientist, weather/climate modeler, remote-sensing scientist, HPC engineer, and applied scientist in government laboratories, universities, weather/climate companies, insurance/catastrophe modeling, utilities, emergency management, Earth-observation, and sustainability teams.
+
+The strongest portfolio artifacts would be:
+\begin{enumerate}
+  \item a reproducible WRF-SFIRE baseline with documented environment;
+  \item a public or shareable dataset card and generation/QC pipeline;
+  \item an honest benchmark including accuracy, uncertainty, latency, memory, and failure cases;
+  \item a clean tested repository with a small demo;
+  \item a poster, workshop paper, preprint, or peer-reviewed publication;
+  \item evidence of collaboration with domain scientists and clear communication of limitations.
+\end{enumerate}
+
+On a resume, quantify the contribution: for example, ``Built a reproducible surrogate for fire-arrival-time prediction on held-out simulations; achieved X IoU and Y-minute arrival-time MAE with Z-fold end-to-end speedup and Q\% lower peak memory.'' Never fill those letters with training-set results.
+
+\section{The first five actions to take now}
+
+\begin{enumerate}
+  \item Send the advisor a concise summary: target, proposed first objective, uncertainties, and the 12 questions in Section 5.
+  \item Obtain the lab's exact WRF-SFIRE version, known-good test/real case, and computing environment.
+  \item Compile and run only \texttt{em\_fire}; capture the commit, logs, namelist, outputs, runtime, and memory.
+  \item Read and plot the fire-arrival/perimeter-related variables; perform one wind and one slope sensitivity test.
+  \item Present a one-page dataset/evaluation design before launching a large simulation ensemble.
+\end{enumerate}
+
+\section{A concise meeting-ready project pitch}
+
+\begin{quote}
+I propose to begin with a reproducible idealized WRF-SFIRE benchmark and learn a surrogate for fire arrival time from terrain, fuels, moisture, ignition, and wind. I will split by complete scenarios, evaluate arrival-time and perimeter errors plus physical constraints, and measure end-to-end speed, RAM/VRAM, and energy on fixed hardware. I will first prove generalization to unseen simulated conditions, then validate selected cases against observations. After that, we can decide whether to extend to two-way atmospheric feedback or WRF-Chem smoke prediction.
+\end{quote}
+
+\section{Source notes and links}
+
+The primary sources below should be rechecked when beginning the work because repositories, documentation, and downloads change. Access dates for web pages: October 3, 2026.
+
+\begin{thebibliography}{99}
+
+\bibitem{mandel2011}
+J. Mandel, J. D. Beezley, and A. K. Kochanski,
+``Coupled atmosphere-wildland fire modeling with WRF 3.3 and SFIRE 2011,''
+\emph{Geoscientific Model Development}, 4, 591--610, 2011.
+\url{https://doi.org/10.5194/gmd-4-591-2011}
+
+\bibitem{wrfsfireRepo}
+OpenWFM, ``WRF-SFIRE source repository and README.''
+\url{https://github.com/openwfm/WRF-SFIRE}
+
+\bibitem{emFireReadme}
+OpenWFM, ``WRF-SFIRE idealized fire test README.''
+\url{https://github.com/openwfm/WRF-SFIRE/blob/master/test/em_fire/README.txt}
+
+\bibitem{openwfmCompile}
+OpenWFM Wiki, ``How to compile WRF-SFIRE.''
+\url{https://wiki.openwfm.org/wiki/How_to_compile_WRF-Fire}
+
+\bibitem{wrfCompile}
+WRF Model, ``WRF Users Guide: Compiling WRF.''
+\url{https://github.com/wrf-model/Users_Guide/blob/main/compiling.rst}
+
+\bibitem{wrfchem}
+NSF NCAR Atmospheric Chemistry Observations \& Modeling,
+``WRF-Chem.''
+\url{https://www2.acom.ucar.edu/wrf-chem}
+
+\bibitem{chemtools}
+NSF NCAR, ``WRF-Chem Preprocessing Tools.''
+\url{https://github.com/NCAR/WRF-Chem-Preprocessing-Tools}
+
+\bibitem{flammap}
+USDA Forest Service, Missoula Fire Sciences Laboratory, ``FlamMap.''
+\url{https://research.fs.usda.gov/firelab/products/dataandtools/flammap}
+
+\bibitem{farsite}
+USDA Forest Service, Missoula Fire Sciences Laboratory, ``FARSITE.''
+\url{https://research.fs.usda.gov/firelab/products/dataandtools/farsite}
+
+\bibitem{farsiteWrong}
+Control Insights, ``FAR SITE: Federal Acquisition Regulation compliance software.''
+\url{https://far.site/}
+
+\bibitem{nasaFire}
+NASA Applied Sciences Disasters Program, ``Fires'' (WRF-SFIRE description and applications).
+\url{https://disasters.nasa.gov/what-we-do/disasters/fires}
+
+\bibitem{mandelAssimilation}
+J. Mandel, A. K. Kochanski, M. Vejmelka, and J. D. Beezley,
+``Data assimilation of satellite fire detection in coupled atmosphere-fire simulation by WRF-SFIRE,'' 2014.
+\url{https://arxiv.org/abs/1410.6948}
+
+\end{thebibliography}
+
+\appendix
+\section{Advisor confirmation form}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.31\textwidth}X}
+Primary prediction target & \hrulefill \\
+Forecast horizon/update rate & \hrulefill \\
+Region and resolution & \hrulefill \\
+Teacher/baseline version & \hrulefill \\
+Observational validation data & \hrulefill \\
+Available compute/storage & \hrulefill \\
+Accuracy threshold & \hrulefill \\
+Speed/memory threshold & \hrulefill \\
+First deliverable and due date & \hrulefill \\
+Expected publication/end user & \hrulefill \\
+\end{tabularx}
+
+\section{Reproducibility checklist}
+
+For every reported result, preserve:
+\begin{itemize}
+  \item code repository URL and exact commit SHA;
+  \item upstream WRF-SFIRE commit/tag and local patches;
+  \item compiler, MPI, NetCDF, operating system, CPU/GPU, and library versions;
+  \item complete namelists/configuration and random seeds;
+  \item raw-data origin, license, checksums, processing version, and split IDs;
+  \item training logs, checkpoints, optimizer/schedule, stopping rule, and selected epoch;
+  \item exact metric code and inclusion/exclusion masks;
+  \item timing protocol, warm-up policy, repeats, batch size, and I/O boundary;
+  \item failed runs and excluded samples with reasons;
+  \item figures/tables generated automatically from archived outputs.
+\end{itemize}
+
+\section{Glossary}
+
+\begin{description}[leftmargin=2.8cm,style=nextline]
+  \item[WRF] Weather Research and Forecasting model, a numerical atmospheric model.
+  \item[SFIRE] Spread FIRE component coupled to WRF.
+  \item[WPS] WRF Preprocessing System for domains, geographic data, and meteorological inputs.
+  \item[WRF-Chem] WRF coupled with atmospheric chemistry and aerosols.
+  \item[FINN] Fire INventory from NCAR, used for fire emissions.
+  \item[NetCDF] Self-describing array-data format widely used for atmospheric model input/output.
+  \item[MPI] Message Passing Interface for distributed-memory parallel execution.
+  \item[Level set] Numerical representation of a moving boundary as a contour of a scalar field.
+  \item[Surrogate] A learned approximation intended to reproduce selected input--output behavior of a costly model.
+  \item[Emulator] Often used synonymously with surrogate; may additionally model uncertainty.
+  \item[IoU] Intersection over union of predicted and reference burned regions.
+  \item[OOD] Out of distribution: conditions meaningfully different from training data.
+  \item[Data assimilation] Statistical combination of observations with model state/forecast.
+\end{description}
+
+\end{document}
